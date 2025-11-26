@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<link rel="stylesheet" href="styles.css">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PhotoBooth Pro</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+    <div id="toast"><i class="fa-solid fa-circle-check" style="color: var(--success)"></i> <span
+            id="toastMsg">Saved</span></div>
+    <div id="toast-container"
+        style="position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:200; display:flex; flex-direction:column; gap:10px; align-items:center;">
+    </div>
+
+    <div class="app-header">
+        <div class="header-left" style="display:flex; align-items:center; gap:20px;">
+            <div class="brand" onclick="toggleGallery()"><i class="fa-solid fa-camera-retro"></i> PhotoBooth Pro</div>
+            <div class="cam-switch-wrapper"
+                style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.05); padding:6px 12px; border-radius:30px; border:1px solid var(--border);">
+                <span
+                    style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Camera</span>
+                <label class="toggle-switch"
+                    style="width: 40px; height: 22px; position:relative; display:inline-block;">
+                    <input type="checkbox" id="cameraToggle" checked onchange="toggleCameraState()"
+                        style="opacity:0;width:0;height:0;">
+                    <span class="slider" style="border-radius:24px;"></span>
+                </label>
+            </div>
+        </div>
+        <button class="btn-outline" id="headerToggleBtn"
+            style="width:auto; padding:8px 16px; border-radius:999px; display:none; align-items:center; gap:6px;"
+            onclick="toggleGallery()">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span>Back</span>
+        </button>
+    </div>
+
+    <div id="view-home" class="view-section active">
+        <div class="main-stage">
+            <div class="home-layout-panel">
+                <div id="cameraSettingsPanelHost"></div>
+            </div>
+
+            <div class="camera-container">
+                <video id="webcam" autoplay playsinline muted></video>
+                <div class="camera-error" id="cameraError"
+                    style="position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; color:var(--text-muted); z-index:5;">
+                    <i class="fa-solid fa-video-slash" style="font-size:3rem; margin-bottom:10px; opacity:0.5;"></i>
+                    <p>Camera Off</p>
+                </div>
+                <div class="flash" id="flash"></div>
+                <div class="overlay-ui">
+                    <div id="retakeIndicator">Retaking Photo #<span id="retakeNum"></span></div>
+                    <div class="countdown" id="countdownDisplay">3</div>
+                    <div id="statusText"
+                        style="background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); padding: 8px 16px; border-radius: 20px; margin-top: 20px; display:none; font-weight:600;">
+                        Take 1 of 4</div>
+                </div>
+            </div>
+
+            <div class="home-preview-panel">
+                <h3>Live Layout Preview</h3>
+                <div class="home-preview-canvas-wrap">
+                    <canvas id="capturePreview"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-bar">
+            <div class="controls-row">
+                <button class="btn-outline mobile-gallery-btn" onclick="toggleGallery()">
+                    <i class="fa-solid fa-images"></i>
+                    <span>Gallery</span>
+                </button>
+
+                <div class="btn-group" id="timerButtons">
+                    <button class="toggle-btn" onclick="setTimer(1)">1s</button>
+                    <button class="toggle-btn active" onclick="setTimer(3)">3s</button>
+                    <button class="toggle-btn" onclick="setTimer(5)">5s</button>
+                    <button class="toggle-btn" onclick="setTimer(10)">10s</button>
+                </div>
+                <div class="shutter-btn" id="shutterBtn" onclick="handleShutter()">
+                    <div class="shutter-inner"></div>
+                </div>
+                <div
+                    style="width: 80px; text-align: center; font-size: 0.8rem; color: var(--text-muted); font-weight:500;">
+                    <span id="modeText">4 Shots</span>
+                </div>
+            </div>
+            <button class="btn-outline layout-settings-btn" onclick="openCameraSettings()">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Layout &amp; Settings</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="view-gallery" class="view-section">
+        <div class="gallery-header">
+            <div style="display:flex; gap:12px; align-items:center;">
+                <h2 style="margin:0; font-size:1.5rem; letter-spacing:-0.02em;">Gallery</h2>
+            </div>
+        </div>
+        <div class="gallery-container">
+            <div id="emptyState" class="empty-gallery"
+                style="display:none; text-align:center; padding:50px; color:var(--text-muted);">
+                <i class="fa-solid fa-images" style="font-size:3rem; margin-bottom:15px; opacity:0.5;"></i>
+                <p>No sessions yet. Capture a layout to see it here.</p>
+            </div>
+            <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
+    </div>
+
+    <div class="bulk-actions" id="bulkActions">
+        <button
+            style="background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3); padding: 8px 20px; border-radius:999px; border:none; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px;"
+            onclick="downloadSelected()">
+            <i class="fa-solid fa-download"></i><span>Download</span>
+        </button>
+        <button
+            style="background: #ef4444; color: white; padding: 8px 16px; border-radius:999px; border:none; display:flex; align-items:center; justify-content:center;"
+            onclick="deleteSelected()">
+            <i class="fa-solid fa-trash"></i>
+        </button>
+        <button
+            style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 18px; border-radius:999px; font-weight:600;"
+            onclick="deselectAll()">Cancel</button>
+    </div>
+
+    <div class="result-modal" id="resultModal">
+        <div class="app-header" style="background: transparent; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div class="brand" style="font-size:1rem;">
+                <span id="autoSaveStatus"
+                    style="font-size:0.85rem; color: var(--text-muted); font-weight:500; display:flex; gap:6px; align-items:center;">
+                    <i class="fa-solid fa-check"></i> Saved
+                </span>
+            </div>
+            <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size:0.85rem; border-radius:50px;"
+                onclick="closeEditor()">
+                <i class="fa-solid fa-floppy-disk"></i> Save changes and close
+            </button>
+        </div>
+
+        <div class="result-content">
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <canvas id="finalCanvas"></canvas>
+                <div class="canvas-hint">
+                    <i class="fa-solid fa-hand-pointer"></i> Tap on a photo in the preview to retake it.
+                </div>
+            </div>
+
+            <div class="edit-sidebar">
+                <div
+                    style="padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+                    <label style="margin:0; font-weight:700; font-size:0.85rem; color:var(--text-main);">Apply style to
+                        all gallery items</label>
+                    <label class="toggle-switch"
+                        style="width: 40px; height: 22px; position:relative; display:inline-block;">
+                        <input type="checkbox" id="applyAllCheck" style="opacity:0;width:0;height:0;">
+                        <span class="slider" style="border-radius:24px;"></span>
+                    </label>
+                </div>
+
+                <div class="control-group open">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span class="accordion-title"><i class="fa-solid fa-layer-group"></i> Layout</span>
+                        <i class="fa-solid fa-chevron-right accordion-icon"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="layout-options">
+                            <div class="layout-btn active" onclick="setLayout('strip', this)"><i
+                                    class="fa-solid fa-film"></i><span>Strip</span></div>
+                            <div class="layout-btn" onclick="setLayout('grid', this)"><i
+                                    class="fa-solid fa-border-all"></i><span>Grid</span></div>
+                            <div class="layout-btn" onclick="setLayout('horizontal', this)"><i
+                                    class="fa-solid fa-arrows-left-right"></i><span>Wide</span></div>
+                        </div>
+                        <div style="margin-top:16px; display:flex; flex-direction:column; gap:8px;">
+                            <span
+                                style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Layout
+                                Templates</span>
+                            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                <button class="btn btn-outline"
+                                    style="width:auto; padding:6px 12px; font-size:0.8rem; border-radius:999px;"
+                                    onclick="downloadTemplate('strip')">
+                                    <i class="fa-solid fa-download"></i><span style="margin-left:6px;">Strip</span>
+                                </button>
+                                <button class="btn btn-outline"
+                                    style="width:auto; padding:6px 12px; font-size:0.8rem; border-radius:999px;"
+                                    onclick="downloadTemplate('grid')">
+                                    <i class="fa-solid fa-download"></i><span style="margin-left:6px;">Grid</span>
+                                </button>
+                                <button class="btn btn-outline"
+                                    style="width:auto; padding:6px 12px; font-size:0.8rem; border-radius:999px;"
+                                    onclick="downloadTemplate('horizontal')">
+                                    <i class="fa-solid fa-download"></i><span style="margin-left:6px;">Wide</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span class="accordion-title"><i class="fa-solid fa-crop-simple"></i> Custom Border</span>
+                        <i class="fa-solid fa-chevron-right accordion-icon"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <div id="borderManagerContainer"></div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="accordion-header" onclick="toggleAccordion(this)">
+                        <span class="accordion-title"><i class="fa-solid fa-palette"></i> Style & Text</span>
+                        <i class="fa-solid fa-chevron-right accordion-icon"></i>
+                    </div>
+                    <div class="accordion-content">
+                        <div class="input-group">
+                            <label>Frame Color</label>
+                            <div class="color-row" style="display:flex; gap:10px;">
+                                <select onchange="setPresetColor(this.value)">
+                                    <option value="">Presets...</option>
+                                    <option value="#000000">Black</option>
+                                    <option value="#ffffff">White</option>
+                                    <option value="#ec4899">Pink</option>
+                                    <option value="#1e293b">Slate</option>
+                                    <option value="#fca5a5">Red</option>
+                                    <option value="#93c5fd">Blue</option>
+                                </select>
+                                <input type="color" id="frameColor" value="#000000" style="width:60px; flex:none;"
+                                    oninput="triggerRender()">
+                            </div>
+                        </div>
+                        <div class="input-group" style="margin-top:16px;">
+                            <label>Text Color</label>
+                            <div class="color-row" style="display:flex; gap:10px;">
+                                <select onchange="setTextColorPreset(this.value)">
+
+                                    <option value="">Presets...</option>
+                                    <option value="#ffffff">White</option>
+                                    <option value="#000000">Black</option>
+                                    <option value="#e5e7eb">Light Gray</option>
+                                    <option value="#020617">Midnight</option>
+                                </select>
+                                <input type="color" id="textColor" value="#ffffff" style="width:60px; flex:none;"
+                                    oninput="handleTextColorInput(this.value)">
+                            </div>
+                        </div>
+                        <div class="input-group" style="margin-top:16px;">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <label style="margin-bottom: 0;">Footer Text</label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <label for="includeDateCheck"
+                                        style="margin:0; font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Date</label>
+                                    <label class="toggle-switch toggle-switch-xs"
+                                        style="position:relative; display:inline-block;">
+                                        <input type="checkbox" id="includeDateCheck" checked onchange="toggleDate()"
+                                            style="opacity:0;width:0;height:0;">
+                                        <span class="slider" style="border-radius:20px;"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="text" id="footerText" value="PhotoBooth Pro" oninput="triggerRender()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-footer">
+                    <div class="input-group" style="margin-bottom:16px;">
+                        <label>File Name</label>
+                        <input type="text" id="fileName" placeholder="untitled" oninput="triggerRender()">
+                    </div>
+                    <button class="btn btn-primary" onclick="downloadImage()">
+                        <i class="fa-solid fa-download"></i> Save PNG
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="cameraSettingsModal" class="camera-settings-modal">
+        <div class="camera-settings-backdrop" onclick="closeCameraSettings()"></div>
+        <div class="camera-settings-sheet">
+            <div class="camera-settings-header">
+                <span>Layout &amp; Settings</span>
+                <button class="btn-outline" style="width:auto; padding:6px 12px; border-radius:999px;" onclick="closeCameraSettings()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="camera-settings-body" id="cameraSettingsHost"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>
